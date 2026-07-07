@@ -1,0 +1,18 @@
+{
+  "id": "darkmatter-foundry-importer",
+  "title": "Dark Matter Foundry Importer",
+  "description": "Imports supported fillable Dark Matter character sheets into Foundry VTT.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "14",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Lee Gelwicks / Zatatmando Gaming"
+    }
+  ],
+  "esmodules": [
+    "dist/foundry/main.js"
+  ]
+}
