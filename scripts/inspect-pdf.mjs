@@ -8,8 +8,14 @@ if (!input) {
 }
 
 const data = new Uint8Array(await readFile(input));
-const pdf = await getDocument({ data }).promise;
+const pdf = await getDocument({ data, useSystemFonts: true }).promise;
 const fields = {};
+
+function normalizeValue(value) {
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.map(normalizeValue).join(", ");
+  return String(value).trim();
+}
 
 for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
   const page = await pdf.getPage(pageNumber);
@@ -18,7 +24,7 @@ for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
   for (const annotation of annotations) {
     if (annotation.subtype !== "Widget" || !annotation.fieldName) continue;
     const value = annotation.fieldValue ?? annotation.buttonValue ?? annotation.exportValue ?? "";
-    fields[annotation.fieldName] = Array.isArray(value) ? value.join(", ") : String(value);
+    fields[annotation.fieldName] = normalizeValue(value);
   }
 }
 

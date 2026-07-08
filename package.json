@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "inspect:pdf": "node scripts/inspect-pdf.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
