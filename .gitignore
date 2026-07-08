@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+
+# macOS metadata
+.DS_Store
+
+# Local PDF test artifacts
+*.pdf
+*.fields.json
+
+# Local environment files
+.env
+.env.*
