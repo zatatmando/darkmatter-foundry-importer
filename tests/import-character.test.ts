@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   importCharacterPdf,
-  importCharacterPdfFile
+  importCharacterPdfFile,
+  importCharacterPdfFiles
 } from "../src/foundry/import-character.js";
 import type { CharacterModel } from "../src/model/character.js";
 
@@ -59,5 +60,60 @@ describe("importCharacterPdf", () => {
 
     expect(parse).toHaveBeenCalledWith(new Uint8Array([4, 5, 6]));
     expect(createActor).toHaveBeenCalledOnce();
+  });
+
+  it("imports multiple browser Files in order", async () => {
+    const first = new File([new Uint8Array([1])], "Theron.pdf", {
+      type: "application/pdf"
+    });
+    const second = new File([new Uint8Array([2])], "Other Character.pdf", {
+      type: "application/pdf"
+    });
+    const parse = vi.fn(async () => theron);
+    const createActor = vi.fn(async (actorData) => ({
+      name: actorData.name
+    }));
+
+    const results = await importCharacterPdfFiles([first, second], {
+      parse,
+      createActor
+    });
+
+    expect(parse).toHaveBeenNthCalledWith(1, new Uint8Array([1]));
+    expect(parse).toHaveBeenNthCalledWith(2, new Uint8Array([2]));
+    expect(createActor).toHaveBeenCalledTimes(2);
+    expect(results).toHaveLength(2);
+  });
+
+  it("uses the Foundry v14 Actor implementation API by default", async () => {
+    const actorGlobal = globalThis as typeof globalThis & {
+      Actor?: {
+        implementation: {
+          create: (actorData: unknown) => Promise<unknown>;
+        };
+      };
+    };
+    const previousActor = actorGlobal.Actor;
+    const create = vi.fn(async () => ({ id: "actor-3" }));
+
+    actorGlobal.Actor = {
+      implementation: {
+        create
+      }
+    };
+
+    try {
+      await importCharacterPdf(new Uint8Array([7, 8, 9]), {
+        parse: async () => theron
+      });
+
+      expect(create).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0]?.[0]).toMatchObject({
+        name: "Theron",
+        type: "character"
+      });
+    } finally {
+      actorGlobal.Actor = previousActor;
+    }
   });
 });

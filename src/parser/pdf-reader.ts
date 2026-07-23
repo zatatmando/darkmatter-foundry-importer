@@ -1,6 +1,11 @@
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export type PdfFields = Record<string, string>;
+
+function configurePdfWorker(): void {
+  if (typeof window === "undefined") return;
+  GlobalWorkerOptions.workerSrc ||= new URL("./pdf.worker.mjs", import.meta.url).href;
+}
 
 function normalizeValue(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -9,6 +14,7 @@ function normalizeValue(value: unknown): string {
 }
 
 export async function extractPdfFields(data: Uint8Array): Promise<PdfFields> {
+  configurePdfWorker();
   const pdf = await getDocument({ data, useSystemFonts: true }).promise;
   const fields: PdfFields = {};
 

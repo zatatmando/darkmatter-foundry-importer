@@ -3,7 +3,10 @@ import { parseCharacterPdf } from "../parser/parse-character.js";
 import { buildActorData, type FoundryActorSource } from "./actor-builder.js";
 
 type FoundryActorApi = {
-  create(source: FoundryActorSource): Promise<unknown>;
+  create?: (source: FoundryActorSource) => Promise<unknown>;
+  implementation?: {
+    create(source: FoundryActorSource): Promise<unknown>;
+  };
 };
 
 export type CharacterPdfParser = (data: Uint8Array) => Promise<CharacterModel>;
@@ -22,11 +25,12 @@ export interface ImportCharacterPdfResult {
 
 function defaultActorCreator(): ActorCreator {
   const actorApi = (globalThis as typeof globalThis & { Actor?: FoundryActorApi }).Actor;
-  if (!actorApi) {
+  const createActor = actorApi?.implementation?.create ?? actorApi?.create;
+  if (!actorApi || !createActor) {
     throw new Error("Foundry Actor API is not available.");
   }
 
-  return (source) => actorApi.create(source);
+  return (source) => createActor.call(actorApi.implementation ?? actorApi, source);
 }
 
 export async function importCharacterPdf(
@@ -52,4 +56,17 @@ export async function importCharacterPdfFile(
 ): Promise<ImportCharacterPdfResult> {
   const data = new Uint8Array(await file.arrayBuffer());
   return importCharacterPdf(data, options);
+}
+
+export async function importCharacterPdfFiles(
+  files: Iterable<File>,
+  options: ImportCharacterPdfOptions = {}
+): Promise<ImportCharacterPdfResult[]> {
+  const results: ImportCharacterPdfResult[] = [];
+
+  for (const file of files) {
+    results.push(await importCharacterPdfFile(file, options));
+  }
+
+  return results;
 }
