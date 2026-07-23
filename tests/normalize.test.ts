@@ -48,21 +48,20 @@ describe("normalizeCharacter", () => {
       "Class Features 5": "Axe of the Mother Tree\nSpacewalkers"
     });
 
-    expect(character.features).toEqual([
-      "EXPERIMENT X",
-      "Bloody Rampage",
-      "Mutation",
-      "Battle Tactics",
-      "Weapon Mastery",
-      "Intrepid Captain",
-      "Gambler",
-      "Rampage",
-      "Iron Wall",
-      "Axe of the Mother Tree",
-      "Spacewalkers"
-    ]);
+    expect(character.features.map((feature) => feature.name)).toEqual([
+  "EXPERIMENT X",
+  "Bloody Rampage",
+  "Mutation",
+  "Battle Tactics",
+  "Weapon Mastery",
+  "Intrepid Captain",
+  "Gambler",
+  "Rampage",
+  "Iron Wall",
+  "Axe of the Mother Tree",
+  "Spacewalkers"
+]);
   });
-
   it("collects inventory fields", () => {
     const character = normalizeCharacter({
       "Inventory 1": "Engineer's Pack\nOmnitool\nVent Tape"

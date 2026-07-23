@@ -1,5 +1,15 @@
 export interface AbilityScores {
-  str: number; dex: number; con: number; int: number; wis: number; cha: number;
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+}
+
+export interface CharacterFeature {
+  name: string;
+  description: string;
 }
 
 export interface CharacterModel {
@@ -10,12 +20,16 @@ export interface CharacterModel {
   species: string;
   background: string;
   abilities: AbilityScores;
-  hp: { value: number; max: number; temp: number };
+  hp: {
+    value: number;
+    max: number;
+    temp: number;
+  };
   ac: number;
   speed: number;
   proficiencyBonus: number;
   credits: number;
-  features: string[];
+  features: CharacterFeature[];
   inventory: string[];
   spells: string[];
 }

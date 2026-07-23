@@ -1,5 +1,7 @@
-import type { CharacterModel } from "../model/character.js";
-
+import type {
+  CharacterFeature,
+  CharacterModel
+} from "../model/character.js";
 type PdfFields = Record<string, string>;
 
 function firstValue(fields: PdfFields, names: string[], fallback = ""): string {
@@ -43,13 +45,16 @@ function collectValues(
     .flatMap(([, value]) => splitValue(value));
 }
 
-function collectFeatures(fields: PdfFields): string[] {
+function collectFeatures(fields: PdfFields): CharacterFeature[] {
   return collectValues(
     fields,
     (fieldName) =>
       /^Features and Traits(?: \d+)?$/i.test(fieldName) ||
       /^Class Features(?: \d+)?$/i.test(fieldName)
-  );
+  ).map((name) => ({
+    name,
+    description: ""
+  }));
 }
 
 function collectSpells(fields: PdfFields): string[] {

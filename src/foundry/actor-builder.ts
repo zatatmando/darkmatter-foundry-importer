@@ -50,7 +50,7 @@ export interface FoundryActorSource {
         subclass: string;
         species: string;
         credits: number;
-        features: string[];
+        features: CharacterModel["features"];
         inventory: string[];
         spells: string[];
       };
@@ -94,7 +94,13 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
   const items = compactItems([
     itemSource(character.className, "class", "class", { levels: character.level }),
     itemSource(character.subclass, "subclass", "subclass"),
-    ...character.features.map((feature) => itemSource(feature, "feat", "feature")),
+    ...character.features.map((feature) =>
+  itemSource(feature.name, "feat", "feature", {
+    description: {
+      value: feature.description
+    }
+  })
+),
     ...character.inventory.map((inventory) => itemSource(inventory, "loot", "inventory")),
     ...character.spells.map((spell) => itemSource(spell, "spell", "spell"))
   ]);

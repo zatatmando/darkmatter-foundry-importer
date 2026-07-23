@@ -15,7 +15,16 @@ const theron: CharacterModel = {
   speed: 30,
   proficiencyBonus: 3,
   credits: 4100,
-  features: ["Scrappy", "Spacewise"],
+  features: [
+  {
+    name: "Scrappy",
+    description: "You are unusually resourceful."
+  },
+  {
+    name: "Spacewise",
+    description: "You know your way around the galaxy."
+  }
+],
   inventory: ["Laser pistol", "Salvage kit"],
   spells: ["Jump"]
 };
@@ -54,7 +63,16 @@ describe("buildActorData", () => {
       subclass: "Experiment X",
       species: "Star Gnome",
       credits: 4100,
-      features: ["Scrappy", "Spacewise"],
+      features: [
+  {
+    name: "Scrappy",
+    description: "You are unusually resourceful."
+  },
+  {
+    name: "Spacewise",
+    description: "You know your way around the galaxy."
+  }
+],
       inventory: ["Laser pistol", "Salvage kit"],
       spells: ["Jump"]
     });
