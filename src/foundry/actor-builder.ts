@@ -1,6 +1,6 @@
 import type { CharacterModel } from "../model/character.js";
 
-const MODULE_ID = "darkmatter-foundry-importer";
+export const MODULE_ID = "darkmatter-foundry-importer";
 
 type AbilityKey = keyof CharacterModel["abilities"];
 
@@ -11,7 +11,18 @@ export interface FoundryItemSource {
   flags: {
     [MODULE_ID]: {
       imported: true;
-      category: "class" | "subclass" | "feature" | "inventory" | "spell";
+      category:
+        | "class"
+        | "subclass"
+        | "species"
+        | "background"
+        | "feature"
+        | "inventory"
+        | "spell";
+      resolved?: boolean;
+      resolver?: "fallback" | "world" | "compendium";
+      pack?: string;
+      documentId?: string;
     };
   };
 }
@@ -45,13 +56,14 @@ export interface FoundryActorSource {
     [MODULE_ID]: {
       imported: true;
       importerVersion: 1;
-      source: {
-        className: string;
-        subclass: string;
-        species: string;
-        credits: number;
-        features: CharacterModel["features"];
-        inventory: string[];
+        source: {
+          className: string;
+          subclass: string;
+          species: string;
+          background: string;
+          credits: number;
+          features: CharacterModel["features"];
+          inventory: CharacterModel["inventory"];
         spells: string[];
       };
     };
@@ -94,14 +106,22 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
   const items = compactItems([
     itemSource(character.className, "class", "class", { levels: character.level }),
     itemSource(character.subclass, "subclass", "subclass"),
+    itemSource(character.species, "race", "species"),
+    itemSource(character.background, "background", "background"),
     ...character.features.map((feature) =>
-  itemSource(feature.name, "feat", "feature", {
-    description: {
-      value: feature.description
-    }
-  })
-),
-    ...character.inventory.map((inventory) => itemSource(inventory, "loot", "inventory")),
+      itemSource(feature.name, "feat", "feature", {
+        description: {
+          value: feature.description
+        }
+      })
+    ),
+    ...character.inventory.map((inventory) =>
+      itemSource(inventory.name, "loot", "inventory", {
+        description: {
+          value: inventory.description
+        }
+      })
+    ),
     ...character.spells.map((spell) => itemSource(spell, "spell", "spell"))
   ]);
 
@@ -132,6 +152,7 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
           className: character.className,
           subclass: character.subclass,
           species: character.species,
+          background: character.background,
           credits: character.credits,
           features: character.features,
           inventory: character.inventory,

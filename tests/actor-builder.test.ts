@@ -16,16 +16,25 @@ const theron: CharacterModel = {
   proficiencyBonus: 3,
   credits: 4100,
   features: [
-  {
-    name: "Scrappy",
-    description: "You are unusually resourceful."
-  },
-  {
-    name: "Spacewise",
-    description: "You know your way around the galaxy."
-  }
-],
-  inventory: ["Laser pistol", "Salvage kit"],
+    {
+      name: "Scrappy",
+      description: "You are unusually resourceful."
+    },
+    {
+      name: "Spacewise",
+      description: "You know your way around the galaxy."
+    }
+  ],
+  inventory: [
+    {
+      name: "Laser pistol",
+      description: "A compact antimatter sidearm."
+    },
+    {
+      name: "Salvage kit",
+      description: "Tools for recovering useful parts."
+    }
+  ],
   spells: ["Jump"]
 };
 
@@ -52,6 +61,8 @@ describe("buildActorData", () => {
     expect(actor.items.map((item) => [item.type, item.name])).toEqual([
       ["class", "Vagabond"],
       ["subclass", "Experiment X"],
+      ["race", "Star Gnome"],
+      ["background", "Salvager"],
       ["feat", "Scrappy"],
       ["feat", "Spacewise"],
       ["loot", "Laser pistol"],
@@ -62,18 +73,28 @@ describe("buildActorData", () => {
       className: "Vagabond",
       subclass: "Experiment X",
       species: "Star Gnome",
+      background: "Salvager",
       credits: 4100,
       features: [
-  {
-    name: "Scrappy",
-    description: "You are unusually resourceful."
-  },
-  {
-    name: "Spacewise",
-    description: "You know your way around the galaxy."
-  }
-],
-      inventory: ["Laser pistol", "Salvage kit"],
+        {
+          name: "Scrappy",
+          description: "You are unusually resourceful."
+        },
+        {
+          name: "Spacewise",
+          description: "You know your way around the galaxy."
+        }
+      ],
+      inventory: [
+        {
+          name: "Laser pistol",
+          description: "A compact antimatter sidearm."
+        },
+        {
+          name: "Salvage kit",
+          description: "Tools for recovering useful parts."
+        }
+      ],
       spells: ["Jump"]
     });
   });

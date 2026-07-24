@@ -12,6 +12,11 @@ export interface CharacterFeature {
   description: string;
 }
 
+export interface CharacterInventoryItem {
+  name: string;
+  description: string;
+}
+
 export interface CharacterModel {
   name: string;
   level: number;
@@ -30,6 +35,6 @@ export interface CharacterModel {
   proficiencyBonus: number;
   credits: number;
   features: CharacterFeature[];
-  inventory: string[];
+  inventory: CharacterInventoryItem[];
   spells: string[];
 }

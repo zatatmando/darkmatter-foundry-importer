@@ -25,7 +25,12 @@ const theron: CharacterModel = {
       description: "You are unusually resourceful."
     }
   ],
-  inventory: ["Laser pistol"],
+  inventory: [
+    {
+      name: "Laser pistol",
+      description: "A compact antimatter sidearm."
+    }
+  ],
   spells: ["Jump"]
 };
 
@@ -33,20 +38,51 @@ describe("importCharacterPdf", () => {
   it("parses PDF bytes, builds actor data, and creates a Foundry actor", async () => {
     const data = new Uint8Array([1, 2, 3]);
     const parse = vi.fn(async () => theron);
+    const resolveItems = vi.fn(async (actorData) => actorData);
     const createActor = vi.fn(async (actorData) => ({
       id: "actor-1",
       name: actorData.name
     }));
 
-    const result = await importCharacterPdf(data, { parse, createActor });
+    const result = await importCharacterPdf(data, {
+      parse,
+      resolveItems,
+      createActor
+    });
 
     expect(parse).toHaveBeenCalledWith(data);
+    expect(resolveItems).toHaveBeenCalledOnce();
     expect(createActor).toHaveBeenCalledOnce();
     expect(createActor.mock.calls[0]?.[0].name).toBe("Theron");
     expect(createActor.mock.calls[0]?.[0].type).toBe("character");
     expect(result.character).toBe(theron);
     expect(result.actorData.system.attributes.hp.max).toBe(36);
     expect(result.actor).toEqual({ id: "actor-1", name: "Theron" });
+  });
+
+  it("creates the actor with resolved item data", async () => {
+    const parse = vi.fn(async () => theron);
+    const createActor = vi.fn(async () => ({ id: "actor-4" }));
+    const resolveItems = vi.fn(async (actorData) => ({
+      ...actorData,
+      items: actorData.items.map((item) =>
+        item.name === "Scrappy"
+          ? {
+              ...item,
+              name: "Resolved Scrappy"
+            }
+          : item
+      )
+    }));
+
+    const result = await importCharacterPdf(new Uint8Array([10]), {
+      parse,
+      resolveItems,
+      createActor
+    });
+
+    expect(result.actorData.items.some((item) => item.name === "Resolved Scrappy")).toBe(true);
+    expect(createActor.mock.calls[0]?.[0].items.some((item) => item.name === "Resolved Scrappy")).toBe(true);
   });
 
   it("reads a browser File before importing", async () => {

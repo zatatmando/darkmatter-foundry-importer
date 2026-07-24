@@ -1,6 +1,7 @@
 import type { CharacterModel } from "../model/character.js";
 import { parseCharacterPdf } from "../parser/parse-character.js";
 import { buildActorData, type FoundryActorSource } from "./actor-builder.js";
+import { resolveActorItems } from "./item-resolver.js";
 
 type FoundryActorApi = {
   create?: (source: FoundryActorSource) => Promise<unknown>;
@@ -11,10 +12,12 @@ type FoundryActorApi = {
 
 export type CharacterPdfParser = (data: Uint8Array) => Promise<CharacterModel>;
 export type ActorCreator = (source: FoundryActorSource) => Promise<unknown>;
+export type ActorItemResolver = (source: FoundryActorSource) => Promise<FoundryActorSource>;
 
 export interface ImportCharacterPdfOptions {
   parse?: CharacterPdfParser;
   createActor?: ActorCreator;
+  resolveItems?: ActorItemResolver;
 }
 
 export interface ImportCharacterPdfResult {
@@ -39,8 +42,9 @@ export async function importCharacterPdf(
 ): Promise<ImportCharacterPdfResult> {
   const parse = options.parse ?? parseCharacterPdf;
   const createActor = options.createActor ?? defaultActorCreator();
+  const resolveItems = options.resolveItems ?? resolveActorItems;
   const character = await parse(data);
-  const actorData = buildActorData(character);
+  const actorData = await resolveItems(buildActorData(character));
   const actor = await createActor(actorData);
 
   return {
