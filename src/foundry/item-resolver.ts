@@ -1,4 +1,5 @@
 import {
+  linkActorOriginItems,
   MODULE_ID,
   type FoundryActorSource,
   type FoundryItemSource
@@ -105,12 +106,14 @@ function sourceFromDocument(
   documentId?: string
 ): FoundryItemSource | null {
   const source = (document.toObject?.() ?? document.toJSON?.() ?? document) as Record<string, unknown>;
+  const sourceId = typeof source._id === "string" ? source._id : documentId ?? document.id;
   const name = typeof source.name === "string" ? source.name : document.name;
   const type = typeof source.type === "string" ? source.type : document.type;
   if (!name || !type) return null;
 
   return {
     ...source,
+    ...(sourceId ? { _id: sourceId } : {}),
     name,
     type,
     flags: {
@@ -200,8 +203,8 @@ export async function resolveActorItems(
     })
   );
 
-  return {
+  return linkActorOriginItems({
     ...actorData,
     items
-  };
+  });
 }

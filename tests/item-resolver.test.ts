@@ -189,6 +189,7 @@ describe("resolveActorItems", () => {
 
       expect(getDocument).toHaveBeenCalledWith("race123");
       expect(resolved).toMatchObject({
+        _id: "race123",
         name: "Vect",
         type: "race",
         flags: {
@@ -201,5 +202,55 @@ describe("resolveActorItems", () => {
     } finally {
       gameGlobal.game = previousGame;
     }
+  });
+
+  it("links resolved species and background items into actor details", async () => {
+    const actorWithOrigins: FoundryActorSource = {
+      ...actorData,
+      items: [
+        {
+          _id: "localRace",
+          name: "Star Gnome",
+          type: "race",
+          flags: {
+            [MODULE_ID]: {
+              imported: true,
+              category: "species"
+            }
+          }
+        },
+        {
+          _id: "localBackground",
+          name: "Salvager",
+          type: "background",
+          flags: {
+            [MODULE_ID]: {
+              imported: true,
+              category: "background"
+            }
+          }
+        }
+      ]
+    };
+
+    const resolved = await resolveActorItems(actorWithOrigins, async (item) => {
+      if (item.flags[MODULE_ID].category === "species") {
+        return {
+          ...item,
+          _id: "mhpStarGnome0000"
+        };
+      }
+      if (item.flags[MODULE_ID].category === "background") {
+        return {
+          ...item,
+          _id: "mhpSalvager00000"
+        };
+      }
+
+      return null;
+    });
+
+    expect(resolved.system.details.race).toBe("mhpStarGnome0000");
+    expect(resolved.system.details.background).toBe("mhpSalvager00000");
   });
 });

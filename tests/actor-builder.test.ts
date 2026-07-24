@@ -50,8 +50,12 @@ describe("buildActorData", () => {
     expect(actor.system.attributes.movement.walk).toBe(30);
     expect(actor.system.attributes.prof).toBe(3);
     expect(actor.system.details.level).toBe(5);
-    expect(actor.system.details.race).toBe("Star Gnome");
-    expect(actor.system.details.background).toBe("Salvager");
+    expect(actor.system.details.race).toBe(
+      actor.items.find((item) => item.name === "Star Gnome")?._id
+    );
+    expect(actor.system.details.background).toBe(
+      actor.items.find((item) => item.name === "Salvager")?._id
+    );
     expect(actor.system.currency.gp).toBe(4100);
   });
 

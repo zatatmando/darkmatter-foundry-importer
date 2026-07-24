@@ -5,6 +5,7 @@ export const MODULE_ID = "darkmatter-foundry-importer";
 type AbilityKey = keyof CharacterModel["abilities"];
 
 export interface FoundryItemSource {
+  _id?: string;
   name: string;
   type: string;
   system?: Record<string, unknown>;
@@ -40,8 +41,8 @@ export interface FoundryActorSource {
     };
     details: {
       level: number;
-      race: string;
-      background: string;
+      race: string | null;
+      background: string | null;
     };
     currency: {
       pp: 0;
@@ -56,14 +57,14 @@ export interface FoundryActorSource {
     [MODULE_ID]: {
       imported: true;
       importerVersion: 1;
-        source: {
-          className: string;
-          subclass: string;
-          species: string;
-          background: string;
-          credits: number;
-          features: CharacterModel["features"];
-          inventory: CharacterModel["inventory"];
+      source: {
+        className: string;
+        subclass: string;
+        species: string;
+        background: string;
+        credits: number;
+        features: CharacterModel["features"];
+        inventory: CharacterModel["inventory"];
         spells: string[];
       };
     };
@@ -80,12 +81,14 @@ function itemSource(
   name: string,
   type: string,
   category: FoundryItemSource["flags"][typeof MODULE_ID]["category"],
-  system: Record<string, unknown> = {}
+  system: Record<string, unknown> = {},
+  id?: string
 ): FoundryItemSource | null {
   const trimmedName = name.trim();
   if (!trimmedName) return null;
 
   return {
+    ...(id ? { _id: id } : {}),
     name: trimmedName,
     type,
     system,
@@ -102,12 +105,65 @@ function compactItems(items: Array<FoundryItemSource | null>): FoundryItemSource
   return items.filter((item): item is FoundryItemSource => item !== null);
 }
 
+function stableItemId(category: string, name: string): string {
+  const input = `${category}:${name}`;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let hash = 0x811c9dc5;
+  let id = "";
+
+  for (let index = 0; index < 16; index++) {
+    const charCode = input.charCodeAt(index % input.length) + index;
+    hash ^= charCode;
+    hash = Math.imul(hash, 0x01000193);
+    id += alphabet[(hash >>> 0) % alphabet.length];
+  }
+
+  return id;
+}
+
+function itemId(item: FoundryItemSource | undefined): string | null {
+  return item?._id ?? null;
+}
+
+export function linkActorOriginItems(actorData: FoundryActorSource): FoundryActorSource {
+  const species = actorData.items.find(
+    (item) => item.flags[MODULE_ID].category === "species"
+  );
+  const background = actorData.items.find(
+    (item) => item.flags[MODULE_ID].category === "background"
+  );
+
+  return {
+    ...actorData,
+    system: {
+      ...actorData.system,
+      details: {
+        ...actorData.system.details,
+        race: itemId(species) ?? actorData.system.details.race,
+        background: itemId(background) ?? actorData.system.details.background
+      }
+    }
+  };
+}
+
 export function buildActorData(character: CharacterModel): FoundryActorSource {
   const items = compactItems([
     itemSource(character.className, "class", "class", { levels: character.level }),
     itemSource(character.subclass, "subclass", "subclass"),
-    itemSource(character.species, "race", "species"),
-    itemSource(character.background, "background", "background"),
+    itemSource(
+      character.species,
+      "race",
+      "species",
+      {},
+      stableItemId("species", character.species)
+    ),
+    itemSource(
+      character.background,
+      "background",
+      "background",
+      {},
+      stableItemId("background", character.background)
+    ),
     ...character.features.map((feature) =>
       itemSource(feature.name, "feat", "feature", {
         description: {
@@ -125,7 +181,7 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
     ...character.spells.map((spell) => itemSource(spell, "spell", "spell"))
   ]);
 
-  return {
+  return linkActorOriginItems({
     name: character.name,
     type: "character",
     system: {
@@ -138,8 +194,8 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
       },
       details: {
         level: character.level,
-        race: character.species,
-        background: character.background
+        race: character.species || null,
+        background: character.background || null
       },
       currency: { pp: 0, gp: character.credits, ep: 0, sp: 0, cp: 0 }
     },
@@ -160,5 +216,5 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
         }
       }
     }
-  };
+  });
 }
