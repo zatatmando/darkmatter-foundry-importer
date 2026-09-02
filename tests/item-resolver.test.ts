@@ -26,7 +26,8 @@ const actorData: FoundryActorSource = {
     details: {
       level: 5,
       race: "Star Gnome",
-      background: "Salvager"
+      background: "Salvager",
+      originalClass: null
     },
     currency: { pp: 0, gp: 4100, ep: 0, sp: 0, cp: 0 }
   },
@@ -53,6 +54,7 @@ const actorData: FoundryActorSource = {
       importerVersion: 1,
       source: {
         className: "Vagabond",
+        classes: [{ name: "Vagabond", level: 5 }],
         subclass: "Experiment X",
         species: "Star Gnome",
         background: "Salvager",
@@ -204,6 +206,118 @@ describe("resolveActorItems", () => {
     }
   });
 
+  it("preserves imported class levels when resolving a compendium class", async () => {
+    const classItem: FoundryActorSource["items"][number] = {
+      name: "Gadgeteer",
+      type: "class",
+      system: {
+        levels: 6,
+        identifier: "gadgeteer"
+      },
+      flags: {
+        [MODULE_ID]: {
+          imported: true,
+          category: "class"
+        }
+      }
+    };
+    const gameGlobal = globalThis as typeof globalThis & { game?: unknown };
+    const previousGame = gameGlobal.game;
+
+    gameGlobal.game = {
+      packs: [
+        {
+          collection: "mage-hand-press-dark-matter.classes",
+          documentName: "Item",
+          metadata: {
+            packageName: "mage-hand-press-dark-matter",
+            type: "Item"
+          },
+          getIndex: vi.fn(async () => [{ _id: "gadgeteer", name: "Gadgeteer", type: "class" }]),
+          getDocument: vi.fn(async () => ({
+            id: "gadgeteer",
+            name: "Gadgeteer",
+            type: "class",
+            toObject: () => ({
+              _id: "gadgeteer",
+              name: "Gadgeteer",
+              type: "class",
+              system: {
+                levels: 1,
+                identifier: "gadgeteer"
+              }
+            })
+          }))
+        }
+      ]
+    };
+
+    try {
+      const resolved = await defaultDarkMatterItemResolver(classItem);
+
+      expect(resolved?.system).toMatchObject({
+        levels: 6,
+        identifier: "gadgeteer"
+      });
+    } finally {
+      gameGlobal.game = previousGame;
+    }
+  });
+
+  it("does not resolve feature names to incompatible item types or monster feature packs", async () => {
+    const featureItem: FoundryActorSource["items"][number] = {
+      name: "Darkvision",
+      type: "feat",
+      flags: {
+        [MODULE_ID]: {
+          imported: true,
+          category: "feature"
+        }
+      }
+    };
+    const gameGlobal = globalThis as typeof globalThis & { game?: unknown };
+    const previousGame = gameGlobal.game;
+
+    gameGlobal.game = {
+      packs: [
+        {
+          collection: "dnd5e.spells",
+          documentName: "Item",
+          metadata: {
+            packageName: "dnd5e",
+            type: "Item"
+          },
+          getIndex: vi.fn(async () => [{ _id: "darkvisionSpell", name: "Darkvision", type: "spell" }]),
+          getDocument: vi.fn(async () => ({
+            id: "darkvisionSpell",
+            name: "Darkvision",
+            type: "spell"
+          }))
+        },
+        {
+          collection: "dnd5e.monsterfeatures",
+          documentName: "Item",
+          metadata: {
+            packageName: "dnd5e",
+            type: "Item"
+          },
+          getIndex: vi.fn(async () => [{ _id: "rampageMonster", name: "Darkvision", type: "feat" }]),
+          getDocument: vi.fn(async () => ({
+            id: "rampageMonster",
+            name: "Darkvision",
+            type: "feat"
+          }))
+        }
+      ]
+    };
+
+    try {
+      await expect(defaultDarkMatterItemResolver(featureItem)).resolves.toBeNull();
+    } finally {
+      gameGlobal.game = previousGame;
+    }
+  });
+
   it("links resolved species and background items into actor details", async () => {
     const actorWithOrigins: FoundryActorSource = {
       ...actorData,
@@ -252,5 +366,53 @@ describe("resolveActorItems", () => {
 
     expect(resolved.system.details.race).toBe("mhpStarGnome0000");
     expect(resolved.system.details.background).toBe("mhpSalvager00000");
+  });
+
+  it("links resolved subclasses to the imported class item", async () => {
+    const actorWithClass: FoundryActorSource = {
+      ...actorData,
+      items: [
+        {
+          _id: "vagabondClass",
+          name: "Vagabond",
+          type: "class",
+          system: {
+            levels: 5
+          },
+          flags: {
+            [MODULE_ID]: {
+              imported: true,
+              category: "class"
+            }
+          }
+        },
+        {
+          _id: "mhpExperimentX00",
+          name: "Experiment X",
+          type: "subclass",
+          system: {
+            classIdentifier: "vagabonds"
+          },
+          flags: {
+            [MODULE_ID]: {
+              imported: true,
+              category: "subclass"
+            }
+          }
+        }
+      ]
+    };
+
+    const resolved = await resolveActorItems(actorWithClass, async () => null);
+    const classItem = resolved.items.find((item) => item.type === "class");
+    const subclass = resolved.items.find((item) => item.type === "subclass");
+
+    expect(classItem?.system).toMatchObject({
+      identifier: "vagabonds"
+    });
+    expect(subclass?.system).toMatchObject({
+      classIdentifier: "vagabonds"
+    });
+    expect(resolved.system.details.originalClass).toBe("vagabondClass");
   });
 });

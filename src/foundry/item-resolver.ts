@@ -88,6 +88,23 @@ function isDarkMatterPack(pack: FoundryPack): boolean {
   );
 }
 
+function isDisallowedFallbackPack(item: FoundryItemSource, pack: FoundryPack): boolean {
+  if (isDarkMatterPack(pack)) return false;
+
+  const category = item.flags[MODULE_ID].category;
+  const text = packText(pack);
+  return (
+    category === "feature" &&
+    (
+      text.includes("monsterfeatures") ||
+      text.includes("monster-features") ||
+      text.includes("monster features") ||
+      text.includes("monster-manual") ||
+      text.includes("monster manual")
+    )
+  );
+}
+
 function categoryMatchesType(category: ItemCategory, type?: string): boolean {
   if (!type) return false;
   if (category === "species") return type === "race";
@@ -96,6 +113,30 @@ function categoryMatchesType(category: ItemCategory, type?: string): boolean {
   if (category === "feature") return ["feat", "equipment", "loot", "weapon", "consumable"].includes(type);
 
   return category === type;
+}
+
+function sourceSystem(
+  source: Record<string, unknown>,
+  fallback: FoundryItemSource
+): Record<string, unknown> {
+  const resolvedSystem =
+    source.system && typeof source.system === "object"
+      ? { ...(source.system as Record<string, unknown>) }
+      : {};
+  const fallbackSystem = fallback.system ?? {};
+  const category = fallback.flags[MODULE_ID].category;
+
+  if (category === "class") {
+    resolvedSystem.levels = fallbackSystem.levels ?? resolvedSystem.levels;
+    resolvedSystem.identifier = resolvedSystem.identifier || fallbackSystem.identifier;
+  }
+
+  if (category === "subclass") {
+    resolvedSystem.classIdentifier =
+      resolvedSystem.classIdentifier || fallbackSystem.classIdentifier;
+  }
+
+  return resolvedSystem;
 }
 
 function sourceFromDocument(
@@ -116,6 +157,7 @@ function sourceFromDocument(
     ...(sourceId ? { _id: sourceId } : {}),
     name,
     type,
+    system: sourceSystem(source, fallback),
     flags: {
       ...((source.flags as Record<string, unknown> | undefined) ?? {}),
       [MODULE_ID]: {
@@ -150,8 +192,12 @@ async function resolvePackItem(item: FoundryItemSource, pack: FoundryPack): Prom
     ? await pack.getIndex({ fields: ["name", "type"] })
     : pack.index;
   const normalizedName = lookupName(item.name);
-  const matches = [...(index ?? [])]
-    .filter((entry) => entry.name && lookupName(entry.name) === normalizedName)
+  const matches = [...(index ?? [])].filter(
+    (entry) =>
+      entry.name &&
+      lookupName(entry.name) === normalizedName &&
+      categoryMatchesType(item.flags[MODULE_ID].category, entry.type)
+  )
     .sort((a, b) => Number(categoryMatchesType(item.flags[MODULE_ID].category, b.type)) - Number(categoryMatchesType(item.flags[MODULE_ID].category, a.type)));
   const match = matches[0];
   const documentId = match?._id ?? match?.id;
@@ -175,6 +221,8 @@ export async function defaultDarkMatterItemResolver(item: FoundryItemSource): Pr
   ];
 
   for (const pack of sortedPacks) {
+    if (isDisallowedFallbackPack(item, pack)) continue;
+
     const resolved = await resolvePackItem(item, pack);
     if (resolved) return resolved;
   }

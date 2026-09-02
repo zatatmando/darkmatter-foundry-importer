@@ -17,9 +17,15 @@ export interface CharacterInventoryItem {
   description: string;
 }
 
+export interface CharacterClass {
+  name: string;
+  level: number;
+}
+
 export interface CharacterModel {
   name: string;
   level: number;
+  classes: CharacterClass[];
   className: string;
   subclass: string;
   species: string;

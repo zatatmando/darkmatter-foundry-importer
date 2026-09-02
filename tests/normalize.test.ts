@@ -26,6 +26,7 @@ describe("normalizeCharacter", () => {
 
     expect(character.name).toBe("Theron");
     expect(character.level).toBe(5);
+    expect(character.classes).toEqual([{ name: "Vagabond", level: 5 }]);
     expect(character.className).toBe("Vagabond");
     expect(character.subclass).toBe("Experiment X");
     expect(character.species).toBe("Star Gnome");
@@ -76,6 +77,67 @@ describe("normalizeCharacter", () => {
       description:
         "Construct Graft (Legs Slot), Uncommon\nThis graft lets you breathe in space."
     });
+  });
+
+  it("normalizes multiclass Dark Matter level fields", () => {
+    const character = normalizeCharacter({
+      "Character Name": "Detective Duston Day",
+      "Class Box": "Paladin/Rogue",
+      "Level Box": "3/2",
+      "Subclass Box": "Oath of the Gamma Knight"
+    });
+
+    expect(character.level).toBe(5);
+    expect(character.classes).toEqual([
+      { name: "Paladin", level: 3 },
+      { name: "Rogue", level: 2 }
+    ]);
+  });
+
+  it("ignores class subclass placeholders as features", () => {
+    const character = normalizeCharacter({
+      "Class Box": "Gadgeteer",
+      "Subclass Box": "Futurist",
+      "Features Box":
+        "Level 3: Gadgeteer Subclass\nChoose your Gadgeteer specialty.\nLevel 3: Advanced Subroutines\nYour AI can run combat routines."
+    });
+
+    expect(character.features.map((feature) => feature.name)).toEqual([
+      "Advanced Subroutines"
+    ]);
+  });
+
+  it("normalizes older numbered character sheet fields", () => {
+    const character = normalizeCharacter({
+      "Character Name 3": "Watch3r",
+      "Class 3": "Monk",
+      "Subclass 3": "Warrior of Gravity",
+      "Level 3": "17",
+      "Race/Subrace 5": "Vect",
+      "Background 5": "Medic",
+      "Prof. Bonus 3": "+6",
+      "Armor Class 9": "17",
+      "Max Hit Points 3": "122",
+      "Hit Points 6": "122",
+      "Str Score 3": "16",
+      "Dex Score 3": "20",
+      "Con Score 3": "14",
+      "Int Score 3": "12",
+      "Wis Score 3": "16",
+      "Cha Score 3": "11",
+      "Speed 3": "55"
+    });
+
+    expect(character.name).toBe("Watch3r");
+    expect(character.level).toBe(17);
+    expect(character.classes).toEqual([{ name: "Monk", level: 17 }]);
+    expect(character.subclass).toBe("Warrior of Gravity");
+    expect(character.species).toBe("Vect");
+    expect(character.background).toBe("Medic");
+    expect(character.abilities.dex).toBe(20);
+    expect(character.hp.max).toBe(122);
+    expect(character.ac).toBe(17);
+    expect(character.proficiencyBonus).toBe(6);
   });
 
   it("collects inventory fields", () => {
@@ -139,6 +201,7 @@ describe("normalizeCharacter", () => {
 
     expect(character.name).toBe("HK-69");
     expect(character.level).toBe(6);
+    expect(character.classes).toEqual([{ name: "Gunslinger", level: 6 }]);
     expect(character.className).toBe("Gunslinger");
     expect(character.subclass).toBe("Laserist");
     expect(character.species).toBe("Vect");
@@ -191,13 +254,20 @@ describe("normalizeCharacter", () => {
     const character = normalizeCharacter({
       "Cantrip 10": "TECHNOMANCY",
       "Spell 88": "TECHNICAL DIFFICULTIES",
-      "Text Field 114": "CIRCUIT BREAKER"
+      "Text Field 114": "CIRCUIT BREAKER",
+      "Spd Box": "30",
+      "Spd Box_3": "Ira",
+      "Spd Box_16": "Finger Guns",
+      "Spd Box_54": "Ballistic Smite",
+      "Spd Box_99": "Off"
     });
 
     expect(character.spells).toEqual([
       "TECHNOMANCY",
       "TECHNICAL DIFFICULTIES",
-      "CIRCUIT BREAKER"
+      "CIRCUIT BREAKER",
+      "Finger Guns",
+      "Ballistic Smite"
     ]);
   });
 });

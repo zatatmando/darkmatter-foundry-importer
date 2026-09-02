@@ -5,6 +5,7 @@ import type { CharacterModel } from "../src/model/character.js";
 const theron: CharacterModel = {
   name: "Theron",
   level: 5,
+  classes: [{ name: "Vagabond", level: 5 }],
   className: "Vagabond",
   subclass: "Experiment X",
   species: "Star Gnome",
@@ -56,6 +57,9 @@ describe("buildActorData", () => {
     expect(actor.system.details.background).toBe(
       actor.items.find((item) => item.name === "Salvager")?._id
     );
+    expect(actor.system.details.originalClass).toBe(
+      actor.items.find((item) => item.name === "Vagabond")?._id
+    );
     expect(actor.system.currency.gp).toBe(4100);
   });
 
@@ -73,8 +77,16 @@ describe("buildActorData", () => {
       ["loot", "Salvage kit"],
       ["spell", "Jump"]
     ]);
+    expect(actor.items.find((item) => item.name === "Vagabond")?.system).toMatchObject({
+      identifier: "vagabonds",
+      levels: 5
+    });
+    expect(actor.items.find((item) => item.name === "Experiment X")?.system).toMatchObject({
+      classIdentifier: "vagabonds"
+    });
     expect(actor.flags["darkmatter-foundry-importer"].source).toEqual({
       className: "Vagabond",
+      classes: [{ name: "Vagabond", level: 5 }],
       subclass: "Experiment X",
       species: "Star Gnome",
       background: "Salvager",
@@ -101,5 +113,32 @@ describe("buildActorData", () => {
       ],
       spells: ["Jump"]
     });
+  });
+
+  it("creates separate class items for multiclass characters", () => {
+    const actor = buildActorData({
+      ...theron,
+      name: "Detective Duston Day",
+      level: 5,
+      classes: [
+        { name: "Paladin", level: 3 },
+        { name: "Rogue", level: 2 }
+      ],
+      className: "Paladin/Rogue",
+      subclass: "Oath of the Gamma Knight"
+    });
+
+    expect(actor.items.filter((item) => item.type === "class").map((item) => [
+      item.name,
+      item.system?.levels,
+      item.system?.identifier
+    ])).toEqual([
+      ["Paladin", 3, "paladin"],
+      ["Rogue", 2, "rogue"]
+    ]);
+    expect(actor.items.find((item) => item.type === "subclass")?.system).toMatchObject({
+      classIdentifier: "paladin"
+    });
+    expect(actor.system.details.level).toBe(5);
   });
 });

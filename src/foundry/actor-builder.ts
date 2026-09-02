@@ -10,6 +10,7 @@ export interface FoundryItemSource {
   type: string;
   system?: Record<string, unknown>;
   flags: {
+    dnd5e?: Record<string, unknown>;
     [MODULE_ID]: {
       imported: true;
       category:
@@ -25,8 +26,11 @@ export interface FoundryItemSource {
       pack?: string;
       documentId?: string;
     };
+    [key: string]: unknown;
   };
 }
+
+type CharacterClassEntry = CharacterModel["classes"][number];
 
 export interface FoundryActorSource {
   name: string;
@@ -43,6 +47,7 @@ export interface FoundryActorSource {
       level: number;
       race: string | null;
       background: string | null;
+      originalClass: string | null;
     };
     currency: {
       pp: 0;
@@ -59,6 +64,7 @@ export interface FoundryActorSource {
       importerVersion: 1;
       source: {
         className: string;
+        classes: CharacterModel["classes"];
         subclass: string;
         species: string;
         background: string;
@@ -121,8 +127,132 @@ function stableItemId(category: string, name: string): string {
   return id;
 }
 
+function identifierFromName(name: string): string {
+  const identifier = name
+    .normalize("NFKD")
+    .replace(/[’‘]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (identifier === "vagabond") return "vagabonds";
+  return identifier;
+}
+
 function itemId(item: FoundryItemSource | undefined): string | null {
   return item?._id ?? null;
+}
+
+function systemString(item: FoundryItemSource | undefined, key: string): string {
+  const value = item?.system?.[key];
+  return typeof value === "string" ? value : "";
+}
+
+function classIdentifier(item: FoundryItemSource | undefined): string {
+  return systemString(item, "identifier") || identifierFromName(item?.name ?? "");
+}
+
+function numericSystemValue(item: FoundryItemSource | undefined, key: string): number {
+  const value = item?.system?.[key];
+  return typeof value === "number" ? value : 0;
+}
+
+function classEntries(character: CharacterModel): CharacterClassEntry[] {
+  if (character.classes.length > 0) return character.classes;
+
+  return character.className
+    ? [{ name: character.className, level: character.level }]
+    : [];
+}
+
+function subclassClassHint(subclass: string): string {
+  const name = identifierFromName(subclass);
+  const hints: Record<string, string> = {
+    "experiment-x": "vagabonds",
+    futurist: "gadgeteer",
+    lasterist: "gunslinger",
+    laserist: "gunslinger",
+    mastermaker: "gadgeteer",
+    "master-maker": "gadgeteer",
+    "oath-of-the-gamma-knight": "paladin",
+    "red-magic": "witch",
+    "warrior-of-gravity": "monk"
+  };
+
+  if (name.startsWith("oath-of-")) return "paladin";
+  return hints[name] ?? "";
+}
+
+function classIdentifierForSubclass(
+  subclass: string,
+  entries: CharacterClassEntry[]
+): string {
+  const hintedIdentifier = subclassClassHint(subclass);
+  if (hintedIdentifier && entries.some((entry) => identifierFromName(entry.name) === hintedIdentifier)) {
+    return hintedIdentifier;
+  }
+
+  const highestLevelClass = [...entries].sort((a, b) => b.level - a.level)[0];
+  return identifierFromName(highestLevelClass?.name ?? "");
+}
+
+function classItemForSubclass(
+  classItems: FoundryItemSource[],
+  subclass: FoundryItemSource | undefined
+): FoundryItemSource | undefined {
+  const subclassClassIdentifier = systemString(subclass, "classIdentifier");
+  if (subclassClassIdentifier) {
+    const matchingClass = classItems.find((item) => classIdentifier(item) === subclassClassIdentifier);
+    if (matchingClass) return matchingClass;
+  }
+
+  return [...classItems].sort(
+    (left, right) => numericSystemValue(right, "levels") - numericSystemValue(left, "levels")
+  )[0];
+}
+
+function featureType(item: FoundryItemSource): { value: string; subtype: string } {
+  const type = item.system?.type;
+  if (!type || typeof type !== "object") return { value: "", subtype: "" };
+
+  const record = type as Record<string, unknown>;
+  return {
+    value: typeof record.value === "string" ? record.value : "",
+    subtype: typeof record.subtype === "string" ? record.subtype : ""
+  };
+}
+
+function featureAdvancementRoot(
+  item: FoundryItemSource,
+  roots: {
+    classId: string | null;
+    speciesId: string | null;
+    backgroundId: string | null;
+  }
+): string | null {
+  if (item.flags[MODULE_ID].category !== "feature") return null;
+
+  const type = featureType(item);
+  if (type.value === "race" || type.subtype === "species") return roots.speciesId;
+  if (type.value === "background" || type.subtype === "origin") return roots.backgroundId;
+  if (type.value === "" || type.value === "class") return roots.classId;
+
+  return null;
+}
+
+function withAdvancementRoot(item: FoundryItemSource, rootId: string | null): FoundryItemSource {
+  if (!rootId) return item;
+
+  return {
+    ...item,
+    flags: {
+      ...item.flags,
+      dnd5e: {
+        ...(item.flags.dnd5e ?? {}),
+        advancementRoot: rootId
+      }
+    }
+  };
 }
 
 export function linkActorOriginItems(actorData: FoundryActorSource): FoundryActorSource {
@@ -132,24 +262,128 @@ export function linkActorOriginItems(actorData: FoundryActorSource): FoundryActo
   const background = actorData.items.find(
     (item) => item.flags[MODULE_ID].category === "background"
   );
+  const classItem = actorData.items.find(
+    (item) => item.flags[MODULE_ID].category === "class"
+  );
+  const classItems = actorData.items.filter(
+    (item) => item.flags[MODULE_ID].category === "class"
+  );
+  const subclass = actorData.items.find(
+    (item) => item.flags[MODULE_ID].category === "subclass"
+  );
+  const subclassClassItem = classItemForSubclass(classItems, subclass);
+  const linkedClassIdentifier =
+    systemString(subclass, "classIdentifier") || classIdentifier(subclassClassItem);
+  const items = actorData.items.map((item) => {
+    if (item.flags[MODULE_ID].category === "class") {
+      const identifier =
+        item === subclassClassItem && linkedClassIdentifier
+          ? linkedClassIdentifier
+          : classIdentifier(item);
+
+      return {
+        ...item,
+        system: {
+          ...(item.system ?? {}),
+          identifier
+        }
+      };
+    }
+
+    if (item === subclass && linkedClassIdentifier && !systemString(item, "classIdentifier")) {
+      return {
+        ...item,
+        system: {
+          ...(item.system ?? {}),
+          classIdentifier: linkedClassIdentifier
+        }
+      };
+    }
+
+    return item;
+  });
+  const linkedClass = items.find(
+    (item) => item === subclassClassItem || item._id === subclassClassItem?._id
+  );
+  const originalClass = items.find(
+    (item) => item.flags[MODULE_ID].category === "class"
+  );
+  const linkedSpecies = items.find(
+    (item) => item.flags[MODULE_ID].category === "species"
+  );
+  const linkedBackground = items.find(
+    (item) => item.flags[MODULE_ID].category === "background"
+  );
+  const classId = itemId(linkedClass);
+  const originalClassId = itemId(originalClass);
+  const speciesId = itemId(linkedSpecies);
+  const backgroundId = itemId(linkedBackground);
+  const linkedItems = items.map((item) =>
+    withAdvancementRoot(
+      item,
+      featureAdvancementRoot(item, {
+        classId: classId ?? originalClassId,
+        speciesId,
+        backgroundId
+      })
+    )
+  );
 
   return {
     ...actorData,
+    items: linkedItems,
     system: {
       ...actorData.system,
       details: {
         ...actorData.system.details,
-        race: itemId(species) ?? actorData.system.details.race,
-        background: itemId(background) ?? actorData.system.details.background
+        race: speciesId ?? actorData.system.details.race,
+        background: backgroundId ?? actorData.system.details.background,
+        originalClass: originalClassId ?? actorData.system.details.originalClass
       }
     }
   };
 }
 
+function featureSystem(description: string): Record<string, unknown> {
+  return {
+    description: {
+      value: description
+    },
+    type: {
+      value: "class",
+      subtype: ""
+    },
+    properties: ["trait"],
+    activities: {}
+  };
+}
+
 export function buildActorData(character: CharacterModel): FoundryActorSource {
+  const classes = classEntries(character);
+  const originalClassId = classes[0] ? stableItemId("class", classes[0].name) : null;
+  const subclassClassIdentifier = classIdentifierForSubclass(character.subclass, classes);
   const items = compactItems([
-    itemSource(character.className, "class", "class", { levels: character.level }),
-    itemSource(character.subclass, "subclass", "subclass"),
+    ...classes.map((entry) =>
+      itemSource(
+        entry.name,
+        "class",
+        "class",
+        {
+          levels: entry.level,
+          identifier: identifierFromName(entry.name)
+        },
+        stableItemId("class", entry.name)
+      )
+    ),
+    itemSource(
+      character.subclass,
+      "subclass",
+      "subclass",
+      {
+        classIdentifier: subclassClassIdentifier
+      },
+      stableItemId("subclass", character.subclass)
+    ),
     itemSource(
       character.species,
       "race",
@@ -165,11 +399,13 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
       stableItemId("background", character.background)
     ),
     ...character.features.map((feature) =>
-      itemSource(feature.name, "feat", "feature", {
-        description: {
-          value: feature.description
-        }
-      })
+      itemSource(
+        feature.name,
+        "feat",
+        "feature",
+        featureSystem(feature.description),
+        stableItemId("feature", feature.name)
+      )
     ),
     ...character.inventory.map((inventory) =>
       itemSource(inventory.name, "loot", "inventory", {
@@ -195,7 +431,8 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
       details: {
         level: character.level,
         race: character.species || null,
-        background: character.background || null
+        background: character.background || null,
+        originalClass: originalClassId
       },
       currency: { pp: 0, gp: character.credits, ep: 0, sp: 0, cp: 0 }
     },
@@ -206,6 +443,7 @@ export function buildActorData(character: CharacterModel): FoundryActorSource {
         importerVersion: 1,
         source: {
           className: character.className,
+          classes: character.classes,
           subclass: character.subclass,
           species: character.species,
           background: character.background,
